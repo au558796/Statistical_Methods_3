@@ -1,0 +1,191 @@
+---
+title: "Assignment III pt. I"
+author: "Dana Jensen"
+date: "October 12, 2017"
+output: html_document
+---
+---
+                          "COMPLETE"
+---
+```{r setup, include=FALSE}
+#prelude
+knitr::opts_chunk$set(echo = TRUE)
+path<-("C:/Users/Dana/Desktop/METHODS III/AssignmentVI")
+setwd(path)
+library(pacman)
+p_load(pastecs, stats, lsr, nonlinearTseries, crqa, readr, stringr, lmerTest, MuMIn)
+
+```
+### Assignment 2 - Part 1 - Assessing voice in schizophrenia
+Can you characterize voice in schizophrenia as acoustically different? Report the methods you used to answer this question and the results from the analyses. Add a couple of lines trying to interpret the results and a couple of lines describing limitations of the data/analyses if any is relevant.
+```{r}
+#NOTE TO SELF:
+# Recurrance rate - how much is covered in black? (%)
+# Determinisim - stability of repetitions, how likely black dot is not isolated,but part of a diagonal (keeps repeating)
+# NR Line = total number of lines in recurrance plot
+# L - how long do shared directories go together?
+# Lmax - maximum trajectory
+# Entropy - when system repeats itself? How unpredictable?
+# Laminarity - Verticle patterns (getting stuck)
+# Trapping Time - how long you are 'trapped' in the state (verticle)
+
+##1. In the course of this assignment you have to first select one datafile and figure out how to:
+
+##Extract "standard" descriptors of pitch: Mean, standard deviation, range
+
+summary.list = function(x){
+  result<-c(
+  Mean=mean(x$f0, na.rm=TRUE),
+  Median=median(x$f0, na.rm=TRUE),
+  Max.Min=range(x$f0, na.rm=TRUE),
+  Range=max(x$f0, na.rm=TRUE) - min(x$f0, na.rm=TRUE),
+  Variance=var(x$f0, na.rm=TRUE),
+  Std.Dev=sd(x$f0, na.rm=TRUE),
+  IQR=IQR(x$f0, na.rm = TRUE),
+  MeanAbsDev=aad(x$f0, na.rm = TRUE),
+  Coeff.Variation.Prcnt=sd(x$f0, na.rm=TRUE)/mean(x$f0, na.rm=TRUE)*100,
+  Std.Error=sd(x$f0, na.rm=TRUE)/sqrt(length(x$f0[!is.na(x)])),
+  Quantile=quantile(x$f0, na.rm=TRUE)
+  )
+return(result)
+}
+
+p = read.delim(pitch_list[1])
+summary.list(p)
+
+##Extract "complex" descriptors: recurrence quantification analysis
+
+#par
+par = list(lgM =  10, steps = seq(1, 6, 1),  radiusspan = 100,  radiussample = 40, normalize = 0,  rescale = 0,  mindiagline = 2,  minvertline = 2,  tw = 0,  whiteline = FALSE,  recpt = FALSE,  fnnpercent = 10,  typeami = 'mindip')
+
+#optimized parameters
+try(optimizeParam(p$f0, p$f0, par, min.rec = 1, max.rec = 10))
+
+#rqa
+rqa_analysis= function(x)(  
+  crqa(x, x, embed = 11, delay = 9, normalize = 0, rescale = 0, radius = 2,
+  mindiagline = 2, minvertline = 1)
+)
+rqa_analysis(p)
+
+##2. Second you will have to turn the code into a function and loop through all the files (or even better use apply/sapply/lapply)
+##- Remember to extract the relevant information from the file names (Participant, Diagnosis, Trial, Study)
+
+rm(dframe)
+folder = file.path(path)
+pitch_list<- list.files(path = folder, recursive = TRUE, pattern = "*f0.txt")
+std = NULL
+mean = NULL
+study = NULL
+range = NULL
+median = NULL
+iqr = NULL
+mad = NULL
+rqa = NULL
+id = NULL
+diagnosis = NULL
+trial = NULL
+Diagnosis = NULL
+Trial = NULL
+RR = NULL
+DET = NULL
+NRLINE = NULL
+maxL = NULL
+L = NULL
+ENTR = NULL
+rENTR = NULL
+LAM = NULL
+TT = NULL
+RP = NULL
+variance = NULL
+x = NULL
+N = 1
+
+
+for (i in pitch_list) {
+  x = read.delim(i, header = T)
+  x = x$f0
+  id = str_extract(i, "S+\\d+")
+  id[N] = str_extract(id,"\\d+")
+  diagnosis[N] = str_extract(str_extract(i,"D+\\d"), "\\d")
+  trial[N] = str_extract(str_extract(i,"T+\\d"), "\\d")
+  study[N] = str_extract(i, "\\d")
+  range[N] = range(x,na.rm = T)
+  mean[N] = mean(x,na.rm = T)
+  variance[N] = var(x, na.rm=TRUE)
+  std[N] = std(x)
+  median[N] = median(x, na.rm = T)
+  iqr[N] = IQR(x,na.rm = T)
+  mad[N] = mad(x,na.rm = T)
+  rqa = crqa(x,x, embed = 2, delay = 1, normalize = 0, rescale = 0, radius = 0.5, mindiagline = 2, minvertline = 1)
+  RR[N] = rqa$RR
+  DET[N] = rqa$DET
+  NRLINE[N] = rqa$NRLINE
+  maxL[N] = rqa$maxL
+  L[N] = rqa$L
+  ENTR[N] = rqa$ENTR
+  rENTR[N] = rqa$rENTR
+  LAM[N] = rqa$LAM
+  TT[N] = rqa$TT
+  N = N+1
+}
+
+dframe = data.frame(id,study,diagnosis,trial,range,mean,variance,std,median,mad,RR,DET,NRLINE,maxL,L,ENTR,rENTR,LAM,TT)
+
+write.csv(dframe, "schizoData.csv")
+
+##3. Make one model per acoustic feature and test whether you can observe significant difference due to Diagnosis.
+# Tip: Which other fixed factors should you control for (that is, include in the model)? Which random ones?
+
+# RR = Recurrence rate
+# DET = Determinism
+# L = L
+# maxL = Maximum trajectory
+# ENTR = Entropy
+# LAM = Laminarity
+# TT = Trapping Time
+# NRLINE = Total number of lines
+
+m_RR = lmer(RR ~ diagnosis + trial + study +  diagnosis*study + (1|study) + (1|id), data = dframe, REML = FALSE)
+
+m_DET = lmer(DET ~ diagnosis + trial + study + diagnosis*study + (1|study) + (1|id), data = dframe, REML = FALSE)
+
+m_L = lmer(L ~ diagnosis + trial + study + diagnosis*study + (1|study) + (1|id), data = dframe, REML = FALSE)
+
+m_maxL = lmer(maxL ~ diagnosis + trial + study + diagnosis*study + (1|study) + (1|id), data = dframe, REML = FALSE)
+
+m_ENTR = lmer(ENTR ~ diagnosis + trial + study + diagnosis*study + (1|study) + (1|id), data = dframe, REML = FALSE)
+
+m_LAM = lmer(LAM ~ diagnosis + trial + study + diagnosis*study + (1|study) + (1|id), data = dframe, REML = FALSE)
+
+m_TT = lmer(TT ~ diagnosis + trial + study + diagnosis*study + (1|study) + (1|id), data = dframe, REML = FALSE)
+
+m_NRLINE = lmer(NRLINE ~ diagnosis + trial + study + diagnosis*study + (1|study) + (1|id), data = dframe, REML = FALSE)
+
+#oh my god I am dyingggggggg
+summary(m_RR)
+r.squaredGLMM(m_RR)
+
+summary(m_DET)
+r.squaredGLMM(m_DET)
+
+summary(m_L)
+r.squaredGLMM(m_L)
+
+summary(m_maxL)
+r.squaredGLMM(m_maxL)
+
+summary(m_ENTR)
+r.squaredGLMM(m_ENTR)
+
+summary(m_LAM)
+r.squaredGLMM(m_LAM)
+
+summary(m_TT)
+r.squaredGLMM(m_TT)
+
+summary(m_NRLINE)
+r.squaredGLMM(m_NRLINE)
+
+##3a. Is study a significant predictor in these models? What should you infer from this? Does study interact with diagnosis? What should you infer from this?
+```

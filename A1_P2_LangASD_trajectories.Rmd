@@ -1,0 +1,144 @@
+---
+title: "Assignment I pt. II"
+author: "Dana Jensen"
+date: "July 7, 2017"
+output: html_document
+---
+---
+                          "COMPLETE"
+---
+```{r setup, include=FALSE}
+#prelude
+knitr::opts_chunk$set(echo = TRUE)
+library(pacman)
+p_load(ggplot2, dplyr, lme4, lmerTest)
+locpath="C:/Users/Dana/Desktop/METHODS III/assignmentIpt.II"
+setwd(locpath)
+data = read.csv("df.csv")
+```
+### Exercise 1) Preliminary Data Exploration, language development in Autism Spectrum Disorder (ASD)
+```{r}
+  ## Describe the participant samples in the dataset (e.g. by diagnosis, age,   etc.). Do you think the two groups are well balanced? If not, what do you think was the reason? Identify relevant variables: participants demographic   characteristics, diagnosis, ADOS, Verbal IQ, Non Verbal IQ, Visit, Number of   words used, Number of unique words used, length of utterance in both child    and parents. Describe the characteristics of the two groups of participants   and whether the two groups are well matched.
+
+#important information only
+data = dplyr::select(data, SUBJ, VISIT, Diagnosis, Gender, Age, Ethnicity, ADOS, MullenRaw, ExpressiveLangRaw, CHI_MLU, types_CHI, tokens_CHI, MOT_MLU)
+
+#Let's compare the two groups
+model =lm(Age~Diagnosis, data = data)#intercept = 43, slop = -12
+summary(model)
+
+plot = ggplot(model, aes(x = Diagnosis, y = Age, colour = Age)) +
+  geom_jitter(aes())+
+  geom_smooth(method = "lm")
+plot
+
+model1 = glm(Gender ~ Diagnosis, family = binomial, data)
+summary(model1)#cant say much except non significant
+
+plot1 = ggplot(model1, aes(x = Diagnosis, y = Gender, color = Gender)) + 
+  geom_jitter(aes())+
+  geom_smooth(method = "lm")
+plot1
+
+model2=glm(Ethnicity ~ Diagnosis, family = binomial, data)
+summary(model2)#not significant
+
+plot2 = ggplot(data, aes(x = Diagnosis, y = Ethnicity, color = Ethnicity)) +
+  geom_jitter(aes())+
+  geom_smooth(method = "lm")
+plot2
+```
+### Exercise 2) Children learning language: the effects of time and ASD
+```{r}
+  ## Let's test hypothesis 1: Children with ASD display a language impairment   ## Hypothesis: The child's MLU changes: i) over time, ii) according to diagnosis. Let's start with a simple mixed effects linear model
+  ## Remember to plot the data first and then to run a statistical test.
+
+  ##How would you evaluate whether the model is a good model?
+  ## Describe linguistic development in TD and ASD children in terms of Mean    Length of Utterance (MLU)?
+
+mlu05_plot = ggplot(data, aes(x = VISIT, y = CHI_MLU, color = Diagnosis)) + 
+  geom_point(aes())+
+  facet_wrap(~Diagnosis)+
+  geom_smooth(method = "lm")
+mlu05_plot
+
+null <- lmer(CHI_MLU ~ 1 + (1+VISIT|SUBJ), data = data, REML = FALSE)
+summary(null)
+model3 = lmer(CHI_MLU~ VISIT + Diagnosis + (1+VISIT|SUBJ), data = data, REML = FALSE)
+summary(model3)
+
+anova(null, model3)
+
+#~~~~~~~~~~~ MIGHT NOT HAVE TO DO THIS
+  ## Let's check whether a growth curve model is better.
+  ## Remember: a growth curve model assesses whether changes in time can be     described by linear, or quadratic, or cubic (or... etc.) components.
+  ## First build the different models, then compare them to see which one is    better
+
+```
+### Exercise 3) Child directed speech as a moving target. Let's test hypothesis 2: Parents speak equally to children with ASD and TD  (Exercise 3). Hypothesis: Parental MLU changes: i) over time, ii) according to diagnosis
+```{r}
+  ## Describe how parental use of language changes over time in terms of MLU.   What do you think is going on?
+
+mlu06_plot = ggplot(data, aes(x = VISIT, y = MOT_MLU, color = VISIT)) + 
+  geom_point(aes())+
+  facet_wrap(~Diagnosis)+
+  geom_smooth(method = "lm")
+mlu06_plot
+
+MOTnull<- lmer(MOT_MLU ~ 1 + (1+VISIT|SUBJ), data = data, REML = FALSE)
+model4 = lmer(MOT_MLU ~ VISIT + Diagnosis + (1+VISIT|SUBJ), data = data, REML = FALSE)
+summary(model4)
+
+anova(MOTnull, model4)
+
+#mother mlu
+mot<-select(data, MOT_MLU)
+m= rep("Mother", 372)
+mot$Speaker = m
+
+#child mlu
+chi = select(data, CHI_MLU, Diagnosis)
+c = rep("Child", 372)
+chi$Speaker = c
+
+#mlu in general
+mlu = c(chi$CHI_MLU,mot$MOT_MLU)
+Speaker = c(chi$Speaker, mot$Speaker)
+
+#visit
+Visit = data$VISIT
+Visit = rep(Visit,2)
+
+#diagnosis
+diagnosis = chi$Diagnosis
+diagnosis = rep(diagnosis, 2)
+
+#make data frame
+mlu = data.frame("Speaker"=Speaker, "Diagnosis"=  diagnosis,"MLU" = mlu, "Visit" = Visit)
+mlu = na.omit(mlu)
+
+#cool plot bro
+mlu_plot = ggplot(mlu, aes(x= Visit, y = MLU, color = Speaker)) +
+  geom_point(aes())+
+  facet_wrap(~Diagnosis)+
+  geom_smooth(method = "lm")
+
+mlu_plot
+
+```
+### Exercise 4) Looking into "individual differences" (demographic, clinical or cognitive profiles)
+```{r}
+  ## Create the best possible model (the one that best explain the data, with   MLU as outcome). Describe your strategy to select the best models (how did    you choose the variables to include?).
+  ## Your task now is to figure out how to best describe the children linguistic trajectory.
+
+#lmer
+nullModel1=lmer(CHI_MLU~1+(1|VISIT), data, REML = F)
+m1 = lmer(CHI_MLU ~ 1 + VISIT + ExpressiveLangRaw + (1+VISIT|SUBJ), data, REML = F)
+m2 = lmer(CHI_MLU ~ 1 + VISIT + ExpressiveLangRaw + MullenRaw +(1+VISIT|SUBJ), data, REML = F)
+m3 = lmer(CHI_MLU ~ 1 + VISIT + ExpressiveLangRaw + MOT_MLU + (1+VISIT|SUBJ), data, REML = F)
+m4 = lmer(CHI_MLU ~ 1 + VISIT + MullenRaw + MOT_MLU + (1+VISIT|SUBJ), data, REML = F)
+
+#anovas
+a<-anova(nullModel1, m1, m2, m3, m4)
+a
+```

@@ -1,0 +1,55 @@
+---
+title: "Assignment 5 - Meta-analysis of pitch in schizophrenia"
+author: "Dana Jensen"
+date: "3/7/2017"
+output: html_document
+---
+---
+                            "INCOMPLETE"
+---
+```{r setup, include=FALSE}
+#knitr::opts_chunk$set(echo = TRUE)
+setwd("C:/Users/Dana/Desktop/METHODS III/AssignmentIX")
+library(pacman)
+p_load(metafor, lme4)
+df<-read.csv("Data.csv", sep = ";")
+schizoData<-read.csv("schizoData.csv", sep = ",")
+```
+## Tips on the process to follow:
+```{r}
+##- Following the procedure in the slides calculate effect size and standard error of the effect size per each study. N.B. we focus on pitch mean and pitch standard deviation.
+
+#yi = "standardized mean difference" cohen's D (which is a distribution)(effect size)
+#vi = variance (within distribution)(kind of like standard error)
+
+pitch_mean = escalc('SMD', n1i= SampleSizeSchizo, n2i=SampleSizeContros, m1i=PitchMeanControls, m2i=PitchMeanSchizo, sd1i=PitchMeanControlsSD, sd2i=PitchMeanSchizoSD, data = df)
+
+pitch_sd<-escalc('SMD', n1i= SampleSizeSchizo, n2i=SampleSizeContros, m1i=PitchSDControls, m2i=PitchSDSchizo, sd1i=PitchSDControlsSD, sd2i=PitchSDSchizoSD, data = df)
+
+## . first try using lmer (to connect to what you know of mixed effects models)
+m1<- lmer(yi ~ 1 + (1|Article),weights=1/vi, data = pitch_mean, control=lmerControl(check.nobs.vs.nlev = "ignore", check.nobs.vs.nRE = "ignore"))
+summary(m1)
+
+m2<- lmer(yi ~ 1 + (1|Article),weights=1/vi, data = pitch_sd, control=lmerControl(check.nobs.vs.nlev = "ignore", check.nobs.vs.nRE = "ignore"))
+summary(m2)
+
+## . then use rma() (to get some juicy additional statistics)
+m3 <- rma(yi, vi, data = pitch_mean, slab=Article)
+
+##- Build a forest plot of the results (forest(model))
+plot1<-forest(m3)
+
+##- Go back to Assignment 3, add your own study to the data table, and re-run meta-analysis. Do the results change?
+
+#scale variables
+
+#instead name, rename column "Article", with riccardo's name (2017)
+
+#sample size for schiz and control
+
+#calculate pitch mean and pitch SD for schizos and controls
+
+
+
+##- Now look at the output of rma() and check tau and I2
+```

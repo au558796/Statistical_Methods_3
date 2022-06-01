@@ -1,0 +1,95 @@
+---
+title: "Assignment 1 - Language Development in ASD - part 2"
+author: "Riccardo Fusaroli"
+date: "July 7, 2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(dplyr)
+library(lmerTest)
+library(lme4)
+library(ggplot2)
+
+#-----Exercise 1
+
+sub_01= subset(csvasm, select = c(subj_id, Diagnosis, Age, Gender, Ethnicity, visit, ADOS, MullenRaw, ExpressiveLangRaw, MOT_MLU, CHI_MLU, types_MOT, types_CHI, tokens_MOT, tokens_CHI))
+
+model1 = glm(Gender~Diagnosis, family = binomial, sub_01)
+summary(model1)
+#InSignifcant
+
+model2 = lm(Age~Diagnosis, sub_01)
+summary(model2)
+#ASD mean age is 43.26 months
+#Typically developing kids are 12 months old younger on average than ASD. 
+#Significant
+
+model3 = glm(Ethnicity~Diagnosis, family = binomial, sub_01)
+summary(model3) 
+#Insignificant
+
+#--------Exercise 2
+
+scatter = ggplot(sub_01, aes(ADOS, ExpressiveLangRaw))
+scatter + geom_point() + geom_smooth(method = "lm")
+#The scatterplot shows that the higers ADOS score a subject has, the lower expressive IQ they have.
+
+scatter = ggplot(sub_01, aes(ADOS, CHI_MLU))
+scatter + geom_point() + geom_smooth(method = "lm")
+#The scatterplot shows that the higers ADOS score a subject has, the lower mean length of utterances the child also have.
+
+bar_01 =ggplot(sub_01,aes(Diagnosis,visit))
+bar_01
+
+#Making models
+
+model_mlu = lmer(CHI_MLU ~ Diagnosis + (1 + visit|subj_id), sub_01)
+summary(model_mlu)
+
+#We want the fixed factor to be diagnosis = the predictor, and the random factors to be visit and subject ID, since individual differences happens over time and across subjects. 
+
+
+#To evaluate the model we could make cross-validation tests, to provide an estimation of how capably the model we made can generalize to new data. It will ensure a good predictive performance by objectively evaluating the performance.
+
+#Cross-validation trains and tests the model on different samples of data, so a model is trained on one dataset and then tested on an independent dataset.
+
+#--------Exercise 3
+
+model_mot_mlu = lmer(MOT_MLU ~ Diagnosis + (1 +visit|subj_id), sub_01)
+summary(model_mot_mlu)
+
+#The parents MLU as predicted by diagnosis, with individual differences over time and across subjects.
+
+
+# We used R (R Core Team (2017) and lme4 (Bates, Maechler, Bolker & Walker, 2015), MuMIN (Barton, 2016), and lmerTest (Kuznetsova, Brockhoff & Christensen, 2016) to perform a linear mixed effects analysis of the relationship between parental use of language over time in terms of MLU. As fixed effects we entered diagnosis into the model, and as random effects we had by-subject random slopes and visit as intercept. 
+# 
+# Both typically developing and children with ASD had a positive significant effect of parental MLU, however parents with typically developing children seemed to produce a greater MLU over time (B  = 0.501, se = 0.115, t-value = 4.351, p<.00000547), whereas this effect was not as explicit in parents wit children diagnosed with ASD (B = 3.678, se = 0.0835, t-value = 44.030, p<.000002). 
+
+#-------Exercise 4 
+best_model_01 = lmerTest::lmer(CHI_MLU ~ Diagnosis + (1+MOT_MLU|ADOS), sub_01)
+summary(best_model_01)
+
+best_model_02 = lmerTest::lmer(CHI_MLU ~ ADOS + (1+Diagnosis|MOT_MLU), sub_01)
+
+bm_02 = lmerTest::lmer(CHI_MLU ~ MOT_MLU + (1+ExpressiveLangRaw|ADOS), sub_01)
+summary(bm_02)
+
+#We want the childs MLU to be predicted by diagnosis so diagnosis = fixed effect. As a random effect (the individual variations) we want the expressive language and mother MLU.
+
+bm_03 = lmerTest::lmer(CHI_MLU ~ ADOS + (1|Diagnosis) + (1|Ethnicity) + (1|ExpressiveLangRaw), sub_01)
+summary(bm_03)
+#Not so good? Look up how to read the outcomes. 
+
+bm_01 = lmerTest::lmer(CHI_MLU ~ Diagnosis + (1|ExpressiveLangRaw) + (1|MOT_MLU), sub_01)
+summary(bm_01)
+
+bm_001 = lmer(CHI_MLU ~ ADOS + ExpressiveLangRaw + (1+ visit|subj_id), sub_01)
+summary(bm_001)
+
+anova(bm_01, bm_001)
+
+# The childs MLU was significantly predicted by ADOS (B = -0.0164, se = 0.00712, t-value = -2.313, p<.0243) and verbal IQ(B = 0.0724, se = 0.00810, t-value = 8.936, p<.0000016).
+```
